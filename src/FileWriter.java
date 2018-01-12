@@ -1,4 +1,7 @@
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -19,6 +22,10 @@ public class FileWriter implements Runnable {
 
     private void writeChunks() throws IOException {
         //TODO
+        List<Chunk> tempList = new LinkedList<>();
+        chunkQueue.drainTo(tempList);
+        //TODO undersatnd where the randomaccessFile should be constructed.
+        RandomAccessFile data = new RandomAccessFile(downloadableMetadata.getFilename(), "w");
     }
 
     @Override
