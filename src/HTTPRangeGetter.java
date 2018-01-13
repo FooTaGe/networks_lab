@@ -1,5 +1,3 @@
-import com.sun.javafx.binding.StringFormatter;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.BlockingQueue;
@@ -27,9 +25,6 @@ public class HTTPRangeGetter implements Runnable {
     }
 
     private void downloadRange() throws IOException, InterruptedException {
-        //TODO
-        //Todo ask to download range. each CHUNK_SIZE create a chunk and add to outQueue
-        //TODO Throw if failed
         URL url = new URL(this.url);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Range", GetRange());
@@ -39,14 +34,16 @@ public class HTTPRangeGetter implements Runnable {
         System.out.println("Content-Length: " + connection.getContentLengthLong());
 
         InputStream inputStream = connection.getInputStream();
-        long size = 0;
-        int val;
+        long size = 0; //the amount of concurrent bytes downloaded bt the thread
+        int val; //the number of bytes read per iteration
         byte[] tempChunkData = new byte[CHUNK_SIZE];
 
+        tokenBucket.take(CHUNK_SIZE); //take first CHUNK_SIZE tokens to initialize download
         while((val = inputStream.read(tempChunkData)) != -1 ){
             Chunk chunk = new Chunk(tempChunkData.clone(), range.getStart() + size, val);
-            size += val;
-            outQueue.add(chunk);
+            size += val; //update size
+            outQueue.add(chunk); //add new chunk of data to outQueue
+            tokenBucket.take(CHUNK_SIZE); //take additional CHUNK_SIZE tokens to continue download
             }
         }
 

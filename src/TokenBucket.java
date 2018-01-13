@@ -1,3 +1,6 @@
+import java.util.concurrent.atomic.*;
+import java.util.concurrent.locks.Lock;
+
 /**
  * A Token Bucket (https://en.wikipedia.org/wiki/Token_bucket)
  *
@@ -11,24 +14,53 @@
  *
  */
 class TokenBucket {
+    long bucketSize;
+    long numOfTokens;
+    Lock bucketLock;
+    boolean terminated;
 
-    TokenBucket() {
-        //TODO
+    TokenBucket(long bucketSize) {
+        this.bucketSize = bucketSize;
+        this.numOfTokens = 0;
+        this.terminated = false;
     }
 
     void take(long tokens) {
-        //TODO
+        bucketLock.lock();
+        try {
+            this.numOfTokens = tokens > numOfTokens ? numOfTokens : tokens;
+        } finally {
+            bucketLock.unlock();
+        }
     }
 
+
+    //TODO add
+    void add(long tokens) {
+        bucketLock.lock();
+        try {
+            long totalTokens = tokens + numOfTokens;
+            this.numOfTokens = totalTokens > bucketSize ? bucketSize : totalTokens;
+        } finally {
+            bucketLock.unlock();
+        }
+    }
+
+    //TODO should these be locked as well?
     void terminate() {
-        //TODO
+        this.terminated = true;
     }
 
     boolean terminated() {
-        //TODO
+        return terminated;
     }
 
     void set(long tokens) {
-        //TODO
+        bucketLock.lock();
+        try {
+            this.numOfTokens = tokens;
+        } finally {
+            bucketLock.unlock();
+        }
     }
 }

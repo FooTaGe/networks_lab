@@ -45,6 +45,26 @@ public class IdcDm {
      * @param maxBytesPerSecond limit on download bytes-per-second
      */
     private static void DownloadURL(String url, int numberOfWorkers, Long maxBytesPerSecond) {
+        TokenBucket tokenBucket;
+        RateLimiter rateLimiter;
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
+
+        //initialize tokenBucket
+        if (maxBytesPerSecond == null) {
+            tokenBucket = new TokenBucket(Long.MAX_VALUE);
+        } else {
+            tokenBucket = new TokenBucket(maxBytesPerSecond * 10);
+        }
+
+        //initialize rateLimiter
+        rateLimiter = new RateLimiter(tokenBucket, maxBytesPerSecond);
+
+
+
+
+
+
+
         //TODO
     }
 }
