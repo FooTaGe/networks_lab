@@ -1,3 +1,5 @@
+import java.util.List;
+
 /**
  * Describes a file's metadata: URL, file name, size, and which parts already downloaded to disk.
  *
@@ -7,18 +9,20 @@
  * CHALLENGE: try to avoid metadata disk footprint of O(n) in the average case
  * HINT: avoid the obvious bitmap solution, and think about ranges...
  */
-class DownloadableMetadata {
+public class DownloadableMetadata {
     private final String metadataFilename;
     private String filename;
     private String url;
+
+    private List<Range> ranges;
+
 
     DownloadableMetadata(String url) {
         this.url = url;
         this.filename = getName(url);
         this.metadataFilename = getMetadataName(filename);
-        //TODO
     }
-}
+
 
     private static String getMetadataName(String filename) {
         return filename + ".metadata";
@@ -29,6 +33,11 @@ class DownloadableMetadata {
     }
 
     void addRange(Range range) {
+        //TODO do the adding and stuff
+
+    }
+
+    void addChunkList(List<Chunk> i_chunkList){
         //TODO
     }
 
@@ -36,8 +45,14 @@ class DownloadableMetadata {
         return filename;
     }
 
+    String getMetadataFilename() {
+        return metadataFilename;
+    }
+
     boolean isCompleted() {
         //TODO
+        return false;
+
     }
 
     void delete() {
@@ -46,6 +61,7 @@ class DownloadableMetadata {
 
     Range getMissingRange() {
         //TODO
+        return null;
     }
 
     String getUrl() {
