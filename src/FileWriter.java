@@ -37,8 +37,8 @@ public class FileWriter implements Runnable {
         metadataBakMD5 = new RandomAccessFile(downloadableMetadata.getMetadataFilename() + ".bak.MD5", "rws");
         boolean endMarkerNotSeen = true;
         while(endMarkerNotSeen){
-            chunkQueue.drainTo(tempList);
-            endMarkerNotSeen = !checkIfDone(tempList);
+            int numOfElements = chunkQueue.drainTo(tempList);
+            endMarkerNotSeen = !checkIfDone(tempList, numOfElements);
             updateFile(tempList);
             updateMetadata(tempList);
             tempList.clear();
@@ -81,12 +81,12 @@ public class FileWriter implements Runnable {
 
 
 
-    private boolean checkIfDone(LinkedList<Chunk> i_list) {
-        if(i_list.size() != 0){
+    private boolean checkIfDone(LinkedList<Chunk> i_list, int i_numOfElements) {
+        if(i_numOfElements > 0){
             Chunk lastChunk = i_list.getLast();
             return  lastChunk.getData() == null;
         }
-        else return true;
+        else return false;
     }
 
     @Override

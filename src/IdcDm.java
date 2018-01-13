@@ -8,6 +8,8 @@ import java.util.concurrent.*;
 
 public class IdcDm {
 
+    static long filesize;
+
     /**
      * Receive arguments from the command-line, provide some feedback and start the download.
      *
@@ -71,7 +73,13 @@ public class IdcDm {
         new Thread(rateLimiter).start();
 
 
+        //todo is this the right place for this?
+        //init fileWriter
+        FileWriter fileWriter = new FileWriter(metadata, queue);
+        //execute
+        new Thread(fileWriter).start();
 
+        /**
         //init executer ranges
         long startRange = 0;
         long filesize = 0;
@@ -84,26 +92,26 @@ public class IdcDm {
         }
         long rangeSize = filesize / numberOfWorkers;
        for (int i = 0; i < numberOfWorkers; i++){
-           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize) :
-                   new Range(startRange, startRange + rangeSize);
+           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize - 1) :
+                   new Range(startRange, startRange + rangeSize - 1);
            executor.execute(new HTTPRangeGetter(url, thisRange, queue, tokenBucket));
-           startRange += rangeSize + 1;
+           startRange += rangeSize;
        }
+        **/
+
+        while(metadata.isCompleted()){
+            Range nextRange;
+            while((nextRange = metadata.getMissingRange()) != null){
+                executor.execute(new HTTPRangeGetter(url, nextRange, queue, tokenBucket));
+            }
+            metadata.ResetPoint();
+        }
 
 
-       //todo is this the right place for this?
-        //init fileWriter
-        FileWriter fileWriter = new FileWriter(metadata, queue);
-        //execute
-        new Thread(fileWriter).start();
 
         //TODO make this proper
         //todo when finished all ranges
-        try {
-            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        executor.shutdown();
         tokenBucket.terminate();
         queue.add(new Chunk(null, 0,0));
 
@@ -127,13 +135,13 @@ public class IdcDm {
         if(Files.exists(Paths.get(metadataName))){
              if(!tryLoadMetadata(metadataName, metadata)){
                  if(!tryLoadMetadata(metadataName + ".bak", metadata)){
-                     metadata = new DownloadableMetadata(url);
+                     metadata = new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
                  }
              }
              return metadata;
         }
         else{
-            return new DownloadableMetadata(url);
+            return new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
         }
     }
 

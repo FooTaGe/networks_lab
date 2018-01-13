@@ -48,6 +48,9 @@ public class HTTPRangeGetter implements Runnable {
         connection.disconnect();
     }
 
+    public static int getChunkSize(){
+        return CHUNK_SIZE;
+    }
 
     public String GetRange(){
         return "bytes=" + range.getStart() + "-" + range.getEnd();
