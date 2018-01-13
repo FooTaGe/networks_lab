@@ -30,29 +30,26 @@ public class HTTPRangeGetter implements Runnable {
         //TODO
         //Todo ask to download range. each CHUNK_SIZE create a chunk and add to outQueue
         //TODO Throw if failed
-        HttpURLConnection  connection = (HttpURLConnection) new URL(url).openConnection();
+        URL url = new URL(this.url);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Range", GetRange());
         connection.connect();
 
-        System.out.println("Respnse Code: " + connection.getResponseCode());
+        System.out.println("Response Code: " + connection.getResponseCode());
         System.out.println("Content-Length: " + connection.getContentLengthLong());
+
         InputStream inputStream = connection.getInputStream();
-        int size = 0;
+        long size = 0;
         int val;
-        byte[] tempChunkData = new byte[4096];
-        while((val = inputStream.read()) != -1 ){
-            size++;
-            if(size > CHUNK_SIZE){
-                //TODO add chunk to outQueue and create new chunk. Set offset of each chunk to it true position meaning range + position.
-                size = 0;
+        byte[] tempChunkData = new byte[CHUNK_SIZE];
+
+        while((val = inputStream.read(tempChunkData)) != -1 ){
+            Chunk chunk = new Chunk(tempChunkData.clone(), range.getStart() + size, val);
+            size += val;
+            outQueue.add(chunk);
             }
-            tempChunkData[size] = (byte)val;
-
         }
-            //TODO create last chunk with remaining bytes.
 
-
-    }
 
     public String GetRange(){
         return "bytes=" + range.getStart() + "-" + range.getEnd();
