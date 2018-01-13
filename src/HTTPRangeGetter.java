@@ -29,7 +29,6 @@ public class HTTPRangeGetter implements Runnable {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Range", GetRange());
         connection.connect();
-
         System.out.println("Response Code: " + connection.getResponseCode());
         System.out.println("Content-Length: " + connection.getContentLengthLong());
 
@@ -44,14 +43,17 @@ public class HTTPRangeGetter implements Runnable {
             size += val; //update size
             outQueue.add(chunk); //add new chunk of data to outQueue
             tokenBucket.take(CHUNK_SIZE); //take additional CHUNK_SIZE tokens to continue download
-            }
         }
+        inputStream.close();
+        connection.disconnect();
+    }
 
 
     public String GetRange(){
         return "bytes=" + range.getStart() + "-" + range.getEnd();
     }
     @Override
+
     public void run() {
         try {
             this.downloadRange();

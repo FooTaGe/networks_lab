@@ -1,5 +1,6 @@
 import java.util.concurrent.atomic.*;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * A Token Bucket (https://en.wikipedia.org/wiki/Token_bucket)
@@ -23,6 +24,7 @@ class TokenBucket {
         this.bucketSize = bucketSize;
         this.numOfTokens = 0;
         this.terminated = false;
+        this.bucketLock = new ReentrantLock(true);
     }
 
     void take(long tokens) {
@@ -35,7 +37,6 @@ class TokenBucket {
     }
 
 
-    //TODO add
     void add(long tokens) {
         bucketLock.lock();
         try {

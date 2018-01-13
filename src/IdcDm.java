@@ -1,3 +1,9 @@
+import java.io.File;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.concurrent.*;
 
 public class IdcDm {
@@ -48,23 +54,102 @@ public class IdcDm {
         TokenBucket tokenBucket;
         RateLimiter rateLimiter;
         ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
+        DownloadableMetadata metadata;
 
-        //initialize tokenBucket
-        if (maxBytesPerSecond == null) {
-            tokenBucket = new TokenBucket(Long.MAX_VALUE);
-        } else {
-            tokenBucket = new TokenBucket(maxBytesPerSecond * 10);
-        }
+        //init blockingQueue
+        BlockingQueue<Chunk> queue = new LinkedBlockingQueue<>();
 
-        //initialize rateLimiter
+        //init tokenBucket
+        tokenBucket = initTokenBucket(maxBytesPerSecond);
+
+        //init metadata
+        metadata = initMetaData(url);
+
+        //init rateLimiter
         rateLimiter = new RateLimiter(tokenBucket, maxBytesPerSecond);
+        //execute ratelimiter
+        new Thread(rateLimiter).start();
 
 
 
+        //init executer ranges
+        long startRange = 0;
+        long filesize = 0;
+        //TODO decie how to deal with this exeption
+        try {
+            filesize = getContentLength(url);
+        }
+        catch (IOException e){
+            //TODO do something- cannot continue without files size unless using 1 thread only
+        }
+        long rangeSize = filesize / numberOfWorkers;
+       for (int i = 0; i < numberOfWorkers; i++){
+           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize) :
+                   new Range(startRange, startRange + rangeSize);
+           executor.execute(new HTTPRangeGetter(url, thisRange, queue, tokenBucket));
+           startRange += rangeSize + 1;
+       }
 
+
+       //todo is this the right place for this?
+        //init fileWriter
+        FileWriter fileWriter = new FileWriter(metadata, queue);
+        //execute
+        new Thread(fileWriter).start();
+
+        //TODO make this proper
+        //todo when finished all ranges
+        try {
+            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        tokenBucket.terminate();
+        queue.add(new Chunk(null, 0,0));
 
 
 
         //TODO
+    }
+
+    private static long getContentLength(String i_url) throws IOException{
+        URL url = new URL(i_url);
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.connect();
+        long contentLength = connection.getContentLength();
+        connection.disconnect();
+        return contentLength;
+    }
+
+    private static DownloadableMetadata initMetaData(String url) {
+        String metadataName = DownloadableMetadata.getMetadataName(DownloadableMetadata.getName(url));
+        DownloadableMetadata metadata = null;
+        if(Files.exists(Paths.get(metadataName))){
+             if(!tryLoadMetadata(metadataName, metadata)){
+                 if(!tryLoadMetadata(metadataName + ".bak", metadata)){
+                     metadata = new DownloadableMetadata(url);
+                 }
+             }
+             return metadata;
+        }
+        else{
+            return new DownloadableMetadata(url);
+        }
+    }
+
+    private static boolean tryLoadMetadata(String metadataName, DownloadableMetadata metadata) {
+        //todo try to read and deserialize, then check if is the samse as MD5
+        //todo update metadata in case of success
+        return false;
+    }
+
+    private static TokenBucket initTokenBucket(Long i_maxBytesPerSecond) {
+        TokenBucket tokenBucket;
+        if (i_maxBytesPerSecond == null) {
+            tokenBucket = new TokenBucket(Long.MAX_VALUE);
+        } else {
+            tokenBucket = new TokenBucket(i_maxBytesPerSecond * 10);
+        }
+        return tokenBucket;
     }
 }

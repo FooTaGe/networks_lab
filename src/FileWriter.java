@@ -82,8 +82,11 @@ public class FileWriter implements Runnable {
 
 
     private boolean checkIfDone(LinkedList<Chunk> i_list) {
-        Chunk lastChunk = i_list.getLast();
-        return  lastChunk == null;
+        if(i_list.size() != 0){
+            Chunk lastChunk = i_list.getLast();
+            return  lastChunk.getData() == null;
+        }
+        else return true;
     }
 
     @Override

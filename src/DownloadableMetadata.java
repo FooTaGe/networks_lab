@@ -24,11 +24,11 @@ public class DownloadableMetadata {
     }
 
 
-    private static String getMetadataName(String filename) {
+    public static String getMetadataName(String filename) {
         return filename + ".metadata";
     }
 
-    private static String getName(String path) {
+    public static String getName(String path) {
         return path.substring(path.lastIndexOf('/') + 1, path.length());
     }
 
