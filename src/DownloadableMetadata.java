@@ -136,4 +136,12 @@ public class DownloadableMetadata implements Serializable {
     String getUrl() {
         return url;
     }
+
+    public long getFilesize() {
+        return m_fileSize;
+    }
+
+    public long getChunkSize() {
+        return m_chunkSize;
+    }
 }

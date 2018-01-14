@@ -53,6 +53,13 @@ public class IdcDm {
      * @param maxBytesPerSecond limit on download bytes-per-second
      */
     private static void DownloadURL(String url, int numberOfWorkers, Long maxBytesPerSecond) {
+        //TODO what to do if throws?
+        try {
+            filesize = getContentLength(url);
+        }
+        catch (IOException e){
+
+        }
         TokenBucket tokenBucket;
         RateLimiter rateLimiter;
         ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
@@ -111,7 +118,7 @@ public class IdcDm {
 
         //TODO make this proper
         //todo when finished all ranges
-        executor.shutdown();
+//        executor.shutdown();
         tokenBucket.terminate();
         queue.add(new Chunk(null, 0,0));
 

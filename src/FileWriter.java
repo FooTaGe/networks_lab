@@ -21,10 +21,13 @@ public class FileWriter implements Runnable {
     private RandomAccessFile metadataBak;
     private RandomAccessFile metadataMD5;
     private RandomAccessFile metadataBakMD5;
+    private long fileSize;
+    private long downloaded = 0;
 
     FileWriter(DownloadableMetadata downloadableMetadata, BlockingQueue<Chunk> chunkQueue) {
         this.chunkQueue = chunkQueue;
         this.downloadableMetadata = downloadableMetadata;
+        downloadableMetadata.getFilesize();
     }
 
     private void writeChunks() throws IOException {
@@ -41,6 +44,9 @@ public class FileWriter implements Runnable {
             endMarkerNotSeen = !checkIfDone(tempList, numOfElements);
             updateFile(tempList);
             updateMetadata(tempList);
+            //TODO should this print be here?
+            downloaded += (long)numOfElements * downloadableMetadata.getChunkSize();
+            System.out.println((downloaded / fileSize) * 100 + "%");
             tempList.clear();
         }
         closeStreams();
