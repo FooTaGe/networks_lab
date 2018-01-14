@@ -62,7 +62,6 @@ public class IdcDm {
         }
         TokenBucket tokenBucket;
         RateLimiter rateLimiter;
-        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
         DownloadableMetadata metadata;
 
         //init blockingQueue
@@ -106,25 +105,35 @@ public class IdcDm {
        }
         **/
 
-        while(metadata.isCompleted()){
-            Range nextRange;
-            while((nextRange = metadata.getMissingRange()) != null){
-                executor.execute(new HTTPRangeGetter(url, nextRange, queue, tokenBucket));
+
+        while (!metadata.isCompleted()) {
+            try {
+                callHTTPGetters(url, queue, tokenBucket, metadata, numberOfWorkers);
             }
-            metadata.ResetPoint();
+            catch (InterruptedException e){
+                //TODO
+            }
         }
-
-
 
         //TODO make this proper
         //todo when finished all ranges
-//        executor.shutdown();
         tokenBucket.terminate();
-        queue.add(new Chunk(null, 0,0));
+        queue.add(new Chunk(null, -1,0));
 
 
 
         //TODO
+    }
+
+    private static void callHTTPGetters(String url, BlockingQueue<Chunk> queue, TokenBucket tokenBucket , DownloadableMetadata metadata, int numberOfWorkers) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
+        Range nextRange;
+        while((nextRange = metadata.getMissingRange()) != null){
+            executor.execute(new HTTPRangeGetter(url, nextRange, queue, tokenBucket));
+        }
+        metadata.ResetPoint();
+        executor.shutdown();
+        executor.awaitTermination(300, TimeUnit.SECONDS);
     }
 
     private static long getContentLength(String i_url) throws IOException{

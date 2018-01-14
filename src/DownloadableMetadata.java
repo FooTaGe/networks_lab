@@ -18,7 +18,7 @@ public class DownloadableMetadata implements Serializable {
     private boolean[] m_chunkMap;
     private int m_chunkSize;
     private int m_point = 0;
-    public final int PARTITION_SIZE = 100;
+    public final int PARTITION_SIZE = 1000;
 
 
 
@@ -48,8 +48,10 @@ public class DownloadableMetadata implements Serializable {
 
     void addChunkList(List<Chunk> i_chunkList){
         for (Chunk i: i_chunkList) {
-            int position = chunkOffsetToPosition(i.getOffset());
-            m_chunkMap[position] = true;
+            if(i.getData() != null) {
+                int position = chunkOffsetToPosition(i.getOffset());
+                m_chunkMap[position] = true;
+            }
         }
     }
 
@@ -87,18 +89,21 @@ public class DownloadableMetadata implements Serializable {
     Range getMissingRange() {
 
         //return null if reached end of map
-        if(m_point == m_chunkMap.length - 1){
+        if(m_point >= m_chunkMap.length - 1){
             return null;
         }
 
         int start = m_point;
-        start++;
         int end = start;
         // get start to the next empty space
         for (; start < m_chunkMap.length; start++) {
             if(m_chunkMap[start] == false){
                 end = start;
                 break;
+            }
+            else if(start == m_chunkMap.length - 1){
+                m_point = m_chunkMap.length;
+                return null;
             }
         }
         //get end to start + PARTION_SIZE or till end of space
@@ -111,6 +116,7 @@ public class DownloadableMetadata implements Serializable {
         m_point = end;
         long rangeStart = positionToStartOffset(start);
         long rangeEnd = positionToEndOffset(end);
+        m_point++;
         return new Range(rangeStart, rangeEnd);
     }
 
