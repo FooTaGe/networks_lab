@@ -1,5 +1,4 @@
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
 import java.util.List;
@@ -16,10 +15,8 @@ public class FileWriter implements Runnable {
     private final BlockingQueue<Chunk> chunkQueue;
     private DownloadableMetadata downloadableMetadata;
     private RandomAccessFile data;
-    private RandomAccessFile metadata;
-    private RandomAccessFile metadataBak;
-    private RandomAccessFile metadataMD5;
-    private RandomAccessFile metadataBakMD5;
+    private ObjectOutputStream metadataStream;
+    private ObjectOutputStream metadataBakStream;
     private long fileSize;
     private long downloaded = 0;
 
@@ -33,8 +30,8 @@ public class FileWriter implements Runnable {
         //TODO
         LinkedList<Chunk> tempList = new LinkedList<>();
         data = new RandomAccessFile(downloadableMetadata.getFilename(), "rws");
-        metadata = new RandomAccessFile(downloadableMetadata.getMetadataFilename(), "rws");
-        metadataBak = new RandomAccessFile(downloadableMetadata.getMetadataFilename() + ".bak", "rws");
+        metadataStream = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()));
+        metadataBakStream = new ObjectOutputStream( new FileOutputStream(downloadableMetadata.getMetadataFilename() + ".bak"));
         boolean endMarkerNotSeen = true;
         while(endMarkerNotSeen){
             int numOfElements = chunkQueue.drainTo(tempList);
@@ -43,7 +40,7 @@ public class FileWriter implements Runnable {
             updateMetadata(tempList);
             //TODO should this print be here?
             downloaded += (long)numOfElements * downloadableMetadata.getChunkSize();
-            System.out.println("Downloaded: " + downloaded + " out of " + fileSize + "\n" + ((double)downloaded / fileSize) * 100 + "%");
+            System.out.println("Downloaded: " + downloaded + " out of " + fileSize + "\n" + downloadableMetadata.getDone() + "%");
             //TODO
             try {
                 Thread.sleep(1000);
@@ -58,15 +55,15 @@ public class FileWriter implements Runnable {
 
     private void closeStreams() throws IOException{
         data.close();
-        metadata.close();
-        metadataBak.close();
+        metadataStream.close();
+        metadataBakStream.close();
     }
 
     private void updateMetadata(LinkedList<Chunk> i_list) throws IOException{
         downloadableMetadata.addChunkList(i_list);
         try {
             //TODO
-            //safeWriteWithBackupMD5(downloadableMetadata);
+            safeWriteWithBackupMD5(downloadableMetadata);
             throw new NoSuchAlgorithmException();
         }
         catch (NoSuchAlgorithmException e){
@@ -75,7 +72,10 @@ public class FileWriter implements Runnable {
     }
 
     private void safeWriteWithBackupMD5(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
-        //MessageDigest digest = MessageDigest.getInstance("MD5");
+        metadataStream.writeObject(downloadableMetadata);
+        metadataStream.flush();
+        metadataBakStream.writeObject(downloadableMetadata);
+        metadataBakStream.flush();
         //TODO look at https://stackoverflow.com/questions/415953/how-can-i-generate-an-md5-hash
     }
 
@@ -83,8 +83,11 @@ public class FileWriter implements Runnable {
     private void updateFile(LinkedList<Chunk> i_list) throws IOException{
         for (Chunk i: i_list) {
             if(i.getData() != null) {
+                if(i.getData().length != 4096){
+                    System.out.println("Fuck");
+                }
                 data.seek(i.getOffset());
-                data.write(i.getData());
+                data.write(i.getData(), 0, i.getSize_in_bytes());
             }
         }
 

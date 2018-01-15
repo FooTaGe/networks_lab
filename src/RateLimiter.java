@@ -20,8 +20,7 @@ public class RateLimiter implements Runnable {
                 try {
                     Thread.sleep(1000); //wait one second
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    //TODO print something
+
                 }
                 tokenBucket.set(tokenBucket.bucketSize);
             }
@@ -31,7 +30,7 @@ public class RateLimiter implements Runnable {
                 try {
                     Thread.sleep(1000); //wait one second
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+
                 }
                 tokenBucket.add(maxBps);
             }

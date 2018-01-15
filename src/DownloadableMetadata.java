@@ -1,5 +1,7 @@
 import java.io.Serializable;
 import java.util.List;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Describes a file's metadata: URL, file name, size, and which parts already downloaded to disk.
@@ -19,6 +21,9 @@ public class DownloadableMetadata implements Serializable {
     private int m_chunkSize;
     private int m_point = 0;
     public final int PARTITION_SIZE = 1000;
+    Lock lock;
+    private int lastDoneReturned = 0;
+
 
 
 
@@ -29,7 +34,10 @@ public class DownloadableMetadata implements Serializable {
         m_fileSize = i_fileSize;
         m_chunkSize = i_chunkSize;
         int arraySize = (int)(m_fileSize/i_chunkSize);
+        arraySize += m_fileSize % i_chunkSize == 0 ? 0 : 1;
         m_chunkMap = new boolean[arraySize];
+        this.lock = new ReentrantLock(true);
+
     }
 
 
@@ -47,17 +55,21 @@ public class DownloadableMetadata implements Serializable {
     }
 
     void addChunkList(List<Chunk> i_chunkList){
-        for (Chunk i: i_chunkList) {
-            if(i.getData() != null) {
-                int position = chunkOffsetToPosition(i.getOffset());
-                m_chunkMap[position] = true;
+        lock.lock();
+        try {
+            for (Chunk i : i_chunkList) {
+                if (i.getData() != null) {
+                    int position = chunkOffsetToPosition(i.getOffset());
+                    m_chunkMap[position] = true;
+                }
             }
+        } finally {
+            lock.unlock();
         }
     }
 
     private int chunkOffsetToPosition(long offset) {
-        int last = offset % m_chunkSize == 0 ? 0 : 1;
-        int position = (int)(offset / m_chunkSize) + last;
+        int position = (int)(offset / m_chunkSize);
         return position;
     }
 
@@ -70,12 +82,17 @@ public class DownloadableMetadata implements Serializable {
     }
 
     boolean isCompleted() {
-        for (boolean i: m_chunkMap) {
-            if(i == false){
-                return false;
+        lock.lock();
+        try {
+            for (boolean i : m_chunkMap) {
+                if (i == false) {
+                    return false;
+                }
             }
+            return true;
+        } finally {
+            lock.unlock();
         }
-        return true;
     }
 
     void delete() {
@@ -87,48 +104,54 @@ public class DownloadableMetadata implements Serializable {
      * @return Range of the next missing range, returns null when reached end, does not mean all ranges arrived.
      */
     Range getMissingRange() {
-
-        //return null if reached end of map
-        if(m_point >= m_chunkMap.length - 1){
-            return null;
-        }
-
-        int start = m_point;
-        int end = start;
-        // get start to the next empty space
-        for (; start < m_chunkMap.length; start++) {
-            if(m_chunkMap[start] == false){
-                end = start;
-                break;
-            }
-            else if(start == m_chunkMap.length - 1){
-                m_point = m_chunkMap.length;
+        lock.lock();
+        try {
+            //return null if reached end of map
+            if (m_point >= m_chunkMap.length - 1) {
                 return null;
             }
-        }
-        //get end to start + PARTION_SIZE or till end of space
-        for (int i = 1; i < PARTITION_SIZE && i + start < m_chunkMap.length ; i++) {
-            if(m_chunkMap[start + i] == true){
-                break;
+
+            int start = m_point;
+            int end = start;
+            // get start to the next empty space
+            for (; start < m_chunkMap.length; start++) {
+                if (m_chunkMap[start] == false) {
+                    end = start;
+                    break;
+                } else if (start == m_chunkMap.length - 1) {
+                    m_point = m_chunkMap.length;
+                    return null;
+                }
             }
-            end++;
+            //get end to start + PARTION_SIZE or till end of space
+            for (int i = 1; i < PARTITION_SIZE && i + start < m_chunkMap.length; i++) {
+                if (m_chunkMap[start + i] == true) {
+                    break;
+                }
+                end++;
+            }
+            m_point = end;
+            long rangeStart = positionToStartOffset(start);
+            long rangeEnd = positionToEndOffset(end);
+            m_point++;
+            if ((rangeEnd - rangeStart) % 4096 != 0){
+                System.out.println("FUUUUCLLL" + rangeStart + " " + rangeEnd);
+            }
+            return new Range(rangeStart, rangeEnd);
+        } finally {
+            lock.unlock();
         }
-        m_point = end;
-        long rangeStart = positionToStartOffset(start);
-        long rangeEnd = positionToEndOffset(end);
-        m_point++;
-        return new Range(rangeStart, rangeEnd);
     }
 
     private long positionToEndOffset(int pos) {
         long ans = positionToStartOffset(pos);
         if(pos == m_chunkMap.length - 1){
             long remainder = m_fileSize % m_chunkSize;
-            remainder = remainder == 0 ? m_chunkSize - 1 : remainder - 1;
-            return ans + remainder;
+            return ans + remainder - 1;
         }
 
         return ans + m_chunkSize - 1;
+
     }
 
     void ResetPoint(){
@@ -149,5 +172,14 @@ public class DownloadableMetadata implements Serializable {
 
     public long getChunkSize() {
         return m_chunkSize;
+    }
+
+    public int getDone(){
+        int count = 0;
+        for (boolean i: m_chunkMap) {
+            count += i ? 1 : 0;
+        }
+        lastDoneReturned = (int)(count * 100 / (double)m_chunkMap.length);
+        return lastDoneReturned;
     }
 }

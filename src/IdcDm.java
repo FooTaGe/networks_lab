@@ -1,5 +1,7 @@
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
@@ -76,14 +78,17 @@ public class IdcDm {
         //init rateLimiter
         rateLimiter = new RateLimiter(tokenBucket, maxBytesPerSecond);
         //execute ratelimiter
-        new Thread(rateLimiter).start();
+         Thread rateLimiterThread =  new Thread(rateLimiter);
+         rateLimiterThread.start();
 
 
         //todo is this the right place for this?
         //init fileWriter
         FileWriter fileWriter = new FileWriter(metadata, queue);
         //execute
-        new Thread(fileWriter).start();
+        Thread fileWriterThread = new Thread(fileWriter);
+        fileWriterThread.start();
+
 
         /**
         //init executer ranges
@@ -109,6 +114,7 @@ public class IdcDm {
         while (!metadata.isCompleted()) {
             try {
                 callHTTPGetters(url, queue, tokenBucket, metadata, numberOfWorkers);
+                Thread.sleep(1000);
             }
             catch (InterruptedException e){
                 //TODO
@@ -117,9 +123,15 @@ public class IdcDm {
 
         //TODO make this proper
         //todo when finished all ranges
-        tokenBucket.terminate();
         queue.add(new Chunk(null, -1,0));
-
+        try {
+            fileWriterThread.join();
+            rateLimiterThread.interrupt();
+        }
+        catch(InterruptedException e){
+            System.out.println(e);
+        }
+        tokenBucket.terminate();
 
 
         //TODO
@@ -134,6 +146,7 @@ public class IdcDm {
         metadata.ResetPoint();
         executor.shutdown();
         executor.awaitTermination(300, TimeUnit.SECONDS);
+
     }
 
     private static long getContentLength(String i_url) throws IOException{
@@ -147,24 +160,39 @@ public class IdcDm {
 
     private static DownloadableMetadata initMetaData(String url) {
         String metadataName = DownloadableMetadata.getMetadataName(DownloadableMetadata.getName(url));
-        DownloadableMetadata metadata = null;
         if(Files.exists(Paths.get(metadataName))){
-             if(!tryLoadMetadata(metadataName, metadata)){
-                 if(!tryLoadMetadata(metadataName + ".bak", metadata)){
-                     metadata = new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
-                 }
+             DownloadableMetadata readMeta = tryLoadMetadata(metadataName);
+             if(readMeta != null){
+                 return readMeta;
              }
-             return metadata;
+             readMeta = tryLoadMetadata(metadataName + ".bak");
+             if(readMeta != null){
+                 return readMeta;
+             }
+
+             return new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
         }
         else{
             return new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
         }
     }
 
-    private static boolean tryLoadMetadata(String metadataName, DownloadableMetadata metadata) {
-        //todo try to read and deserialize, then check if is the samse as MD5
-        //todo update metadata in case of success
-        return false;
+    private static DownloadableMetadata tryLoadMetadata(String metadataName) {
+        try {
+            ObjectInputStream stream = new ObjectInputStream(new FileInputStream(metadataName));
+            Object readMeta = stream.readObject();
+            if(readMeta instanceof DownloadableMetadata){
+                return (DownloadableMetadata)readMeta;
+            }
+            return null;
+        }
+        catch (IOException e){
+            return null;
+        }
+        catch(ClassNotFoundException e){
+            return null;
+        }
+
     }
 
     private static TokenBucket initTokenBucket(Long i_maxBytesPerSecond) {
