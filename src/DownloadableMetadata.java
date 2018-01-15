@@ -1,3 +1,5 @@
+import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.io.Serializable;
 import java.util.List;
 import java.util.concurrent.locks.Lock;
@@ -23,6 +25,7 @@ public class DownloadableMetadata implements Serializable {
     public final int PARTITION_SIZE = 1000;
     Lock lock;
     private int lastDoneReturned = 0;
+    private static final long serialVersionUID = 1337L;
 
 
 
@@ -181,5 +184,8 @@ public class DownloadableMetadata implements Serializable {
         }
         lastDoneReturned = (int)(count * 100 / (double)m_chunkMap.length);
         return lastDoneReturned;
+    }
+    private void readObject(ObjectInputStream aInputStream) throws ClassNotFoundException, IOException {
+        aInputStream.defaultReadObject();
     }
 }
