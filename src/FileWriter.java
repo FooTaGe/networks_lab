@@ -1,10 +1,7 @@
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.security.MessageDigest;
 
 /**
  * This class takes chunks from the queue, writes them to disk and updates the file's metadata.
@@ -17,30 +14,35 @@ public class FileWriter implements Runnable {
     private final BlockingQueue<Chunk> chunkQueue;
     private DownloadableMetadata downloadableMetadata;
     private RandomAccessFile data;
-    private RandomAccessFile metadata;
-    private RandomAccessFile metadataBak;
-    private RandomAccessFile metadataMD5;
-    private RandomAccessFile metadataBakMD5;
+    private ObjectOutputStream metadataStream;
+    private ObjectOutputStream metadataBakStream;
+    private long fileSize;
+    private int downloaded = -1;
 
     FileWriter(DownloadableMetadata downloadableMetadata, BlockingQueue<Chunk> chunkQueue) {
         this.chunkQueue = chunkQueue;
         this.downloadableMetadata = downloadableMetadata;
+        fileSize = downloadableMetadata.getFilesize();
     }
 
     private void writeChunks() throws IOException {
         //TODO
         LinkedList<Chunk> tempList = new LinkedList<>();
         data = new RandomAccessFile(downloadableMetadata.getFilename(), "rws");
-        metadata = new RandomAccessFile(downloadableMetadata.getMetadataFilename(), "rws");
-        metadataBak = new RandomAccessFile(downloadableMetadata.getMetadataFilename() + ".bak", "rws");
-        metadataMD5 = new RandomAccessFile(downloadableMetadata.getMetadataFilename() + ".MD5", "rws");
-        metadataBakMD5 = new RandomAccessFile(downloadableMetadata.getMetadataFilename() + ".bak.MD5", "rws");
+        metadataStream = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()));
+        metadataBakStream = new ObjectOutputStream( new FileOutputStream(downloadableMetadata.getMetadataFilename() + ".bak"));
+
         boolean endMarkerNotSeen = true;
         while(endMarkerNotSeen){
-            chunkQueue.drainTo(tempList);
-            endMarkerNotSeen = !checkIfDone(tempList);
+            int numOfElements = chunkQueue.drainTo(tempList);
+            endMarkerNotSeen = !checkIfDone(tempList, numOfElements);
             updateFile(tempList);
             updateMetadata(tempList);
+            int tempDone;
+            if((tempDone = downloadableMetadata.getDone()) != downloaded) {
+                downloaded = tempDone;
+                System.out.println("Downloaded: " + downloaded + "%");
+            }
             tempList.clear();
         }
         closeStreams();
@@ -48,45 +50,55 @@ public class FileWriter implements Runnable {
 
     private void closeStreams() throws IOException{
         data.close();
-        metadata.close();
-        metadataBak.close();
-        metadataMD5.close();
-        metadataBakMD5.close();
+        metadataStream.close();
+        metadataBakStream.close();
     }
 
     private void updateMetadata(LinkedList<Chunk> i_list) throws IOException{
         downloadableMetadata.addChunkList(i_list);
         try {
-            safeWriteWithBackupMD5(downloadableMetadata);
+            //TODO
+            safeWriteWithBackup(downloadableMetadata);
         }
         catch (NoSuchAlgorithmException e){
             //Todo problem i need to print to screen and close program
         }
     }
 
-    private void safeWriteWithBackupMD5(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
-        MessageDigest digest = MessageDigest.getInstance("MD5");
+    private void safeWriteWithBackup(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
+        try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()))) {
+            writer.writeObject(downloadableMetadata);
+            writer.flush();
+            writer.close();
+        }
+        try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename() + ".bak"))) {
+            writer.writeObject(downloadableMetadata);
+            writer.flush();
+            writer.close();
+        }
+
         //TODO look at https://stackoverflow.com/questions/415953/how-can-i-generate-an-md5-hash
     }
 
 
     private void updateFile(LinkedList<Chunk> i_list) throws IOException{
         for (Chunk i: i_list) {
-            data.seek(i.getOffset());
-            data.write(i.getData());
+            if(i.getData() != null) {
+                data.seek(i.getOffset());
+                data.write(i.getData(), 0, i.getSize_in_bytes());
+            }
         }
 
 
     }
 
 
-
-    private boolean checkIfDone(LinkedList<Chunk> i_list) {
-        if(i_list.size() != 0){
+    private boolean checkIfDone(LinkedList<Chunk> i_list, int i_numOfElements) {
+        if(i_numOfElements > 0){
             Chunk lastChunk = i_list.getLast();
             return  lastChunk.getData() == null;
         }
-        else return true;
+        else return false;
     }
 
     @Override

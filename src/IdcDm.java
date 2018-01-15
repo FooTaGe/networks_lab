@@ -1,5 +1,7 @@
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
@@ -7,6 +9,8 @@ import java.nio.file.Paths;
 import java.util.concurrent.*;
 
 public class IdcDm {
+
+    static long filesize;
 
     /**
      * Receive arguments from the command-line, provide some feedback and start the download.
@@ -51,9 +55,15 @@ public class IdcDm {
      * @param maxBytesPerSecond limit on download bytes-per-second
      */
     private static void DownloadURL(String url, int numberOfWorkers, Long maxBytesPerSecond) {
+        //TODO what to do if throws?
+        try {
+            filesize = getContentLength(url);
+        }
+        catch (IOException e){
+
+        }
         TokenBucket tokenBucket;
         RateLimiter rateLimiter;
-        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
         DownloadableMetadata metadata;
 
         //init blockingQueue
@@ -68,10 +78,19 @@ public class IdcDm {
         //init rateLimiter
         rateLimiter = new RateLimiter(tokenBucket, maxBytesPerSecond);
         //execute ratelimiter
-        new Thread(rateLimiter).start();
+         Thread rateLimiterThread =  new Thread(rateLimiter);
+         rateLimiterThread.start();
 
 
+        //todo is this the right place for this?
+        //init fileWriter
+        FileWriter fileWriter = new FileWriter(metadata, queue);
+        //execute
+        Thread fileWriterThread = new Thread(fileWriter);
+        fileWriterThread.start();
 
+
+        /**
         //init executer ranges
         long startRange = 0;
         long filesize = 0;
@@ -84,32 +103,50 @@ public class IdcDm {
         }
         long rangeSize = filesize / numberOfWorkers;
        for (int i = 0; i < numberOfWorkers; i++){
-           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize) :
-                   new Range(startRange, startRange + rangeSize);
+           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize - 1) :
+                   new Range(startRange, startRange + rangeSize - 1);
            executor.execute(new HTTPRangeGetter(url, thisRange, queue, tokenBucket));
-           startRange += rangeSize + 1;
+           startRange += rangeSize;
        }
+        **/
 
 
-       //todo is this the right place for this?
-        //init fileWriter
-        FileWriter fileWriter = new FileWriter(metadata, queue);
-        //execute
-        new Thread(fileWriter).start();
+        while (!metadata.isCompleted()) {
+            try {
+                callHTTPGetters(url, queue, tokenBucket, metadata, numberOfWorkers);
+                Thread.sleep(1000);
+            }
+            catch (InterruptedException e){
+                //TODO
+            }
+        }
 
         //TODO make this proper
         //todo when finished all ranges
+        queue.add(new Chunk(null, -1,0));
         try {
-            executor.awaitTermination(Long.MAX_VALUE, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            fileWriterThread.join();
+            rateLimiterThread.interrupt();
+        }
+        catch(InterruptedException e){
+            System.out.println(e);
         }
         tokenBucket.terminate();
-        queue.add(new Chunk(null, 0,0));
-
 
 
         //TODO
+    }
+
+    private static void callHTTPGetters(String url, BlockingQueue<Chunk> queue, TokenBucket tokenBucket , DownloadableMetadata metadata, int numberOfWorkers) throws InterruptedException {
+        ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
+        Range nextRange;
+        while((nextRange = metadata.getMissingRange()) != null){
+            executor.execute(new HTTPRangeGetter(url, nextRange, queue, tokenBucket));
+        }
+        metadata.ResetPoint();
+        executor.shutdown();
+        executor.awaitTermination(300, TimeUnit.SECONDS);
+
     }
 
     private static long getContentLength(String i_url) throws IOException{
@@ -123,24 +160,39 @@ public class IdcDm {
 
     private static DownloadableMetadata initMetaData(String url) {
         String metadataName = DownloadableMetadata.getMetadataName(DownloadableMetadata.getName(url));
-        DownloadableMetadata metadata = null;
         if(Files.exists(Paths.get(metadataName))){
-             if(!tryLoadMetadata(metadataName, metadata)){
-                 if(!tryLoadMetadata(metadataName + ".bak", metadata)){
-                     metadata = new DownloadableMetadata(url);
-                 }
+             DownloadableMetadata readMeta = tryLoadMetadata(metadataName);
+             if(readMeta != null){
+                 return readMeta;
              }
-             return metadata;
+             readMeta = tryLoadMetadata(metadataName + ".bak");
+             if(readMeta != null){
+                 return readMeta;
+             }
+
+             return new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
         }
         else{
-            return new DownloadableMetadata(url);
+            return new DownloadableMetadata(url, filesize, HTTPRangeGetter.getChunkSize());
         }
     }
 
-    private static boolean tryLoadMetadata(String metadataName, DownloadableMetadata metadata) {
-        //todo try to read and deserialize, then check if is the samse as MD5
-        //todo update metadata in case of success
-        return false;
+    private static DownloadableMetadata tryLoadMetadata(String metadataName) {
+        try {
+            ObjectInputStream stream = new ObjectInputStream(new FileInputStream(metadataName));
+            Object readMeta = stream.readObject();
+            if(readMeta instanceof DownloadableMetadata){
+                return (DownloadableMetadata)readMeta;
+            }
+            return null;
+        }
+        catch (IOException e){
+            return null;
+        }
+        catch(ClassNotFoundException e){
+            return null;
+        }
+
     }
 
     private static TokenBucket initTokenBucket(Long i_maxBytesPerSecond) {

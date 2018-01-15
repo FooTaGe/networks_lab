@@ -29,17 +29,19 @@ public class HTTPRangeGetter implements Runnable {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Range", GetRange());
         connection.connect();
-        System.out.println("Response Code: " + connection.getResponseCode());
-        System.out.println("Content-Length: " + connection.getContentLengthLong());
+        //TODO what todo if fail (not code 206)
+        //System.out.println("Response Code: " + connection.getResponseCode());
+        //System.out.println("Content-Length: " + connection.getContentLengthLong());
 
         InputStream inputStream = connection.getInputStream();
-        long size = 0; //the amount of concurrent bytes downloaded bt the thread
+        long size = 0; //the amount of bytes downloaded by the thread
         int val; //the number of bytes read per iteration
         byte[] tempChunkData = new byte[CHUNK_SIZE];
 
         tokenBucket.take(CHUNK_SIZE); //take first CHUNK_SIZE tokens to initialize download
-        while((val = inputStream.read(tempChunkData)) != -1 ){
-            Chunk chunk = new Chunk(tempChunkData.clone(), range.getStart() + size, val);
+
+        while((val = readChunk(inputStream, tempChunkData)) != -1 ){
+            Chunk chunk = new Chunk(tempChunkData, range.getStart() + size, val);
             size += val; //update size
             outQueue.add(chunk); //add new chunk of data to outQueue
             tokenBucket.take(CHUNK_SIZE); //take additional CHUNK_SIZE tokens to continue download
@@ -48,6 +50,22 @@ public class HTTPRangeGetter implements Runnable {
         connection.disconnect();
     }
 
+    private int readChunk(InputStream stream, byte[] data) throws IOException {
+        int count = 0;
+        int val;
+        for (; count < CHUNK_SIZE; count++) {
+            val = stream.read();
+            if (val == -1) {
+                return count == 0 ? -1 : count;
+            }
+            data[count] = (byte) val;
+        }
+        return count;
+    }
+
+    public static int getChunkSize(){
+        return CHUNK_SIZE;
+    }
 
     public String GetRange(){
         return "bytes=" + range.getStart() + "-" + range.getEnd();
