@@ -137,9 +137,6 @@ public class DownloadableMetadata implements Serializable {
             long rangeStart = positionToStartOffset(start);
             long rangeEnd = positionToEndOffset(end);
             m_point++;
-            if ((rangeEnd - rangeStart) % 4096 != 0){
-                System.out.println("FUUUUCLLL" + rangeStart + " " + rangeEnd);
-            }
             return new Range(rangeStart, rangeEnd);
         } finally {
             lock.unlock();

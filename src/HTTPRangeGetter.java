@@ -29,8 +29,9 @@ public class HTTPRangeGetter implements Runnable {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestProperty("Range", GetRange());
         connection.connect();
-        System.out.println("Response Code: " + connection.getResponseCode());
-        System.out.println("Content-Length: " + connection.getContentLengthLong());
+        //TODO what todo if fail (not code 206)
+        //System.out.println("Response Code: " + connection.getResponseCode());
+        //System.out.println("Content-Length: " + connection.getContentLengthLong());
 
         InputStream inputStream = connection.getInputStream();
         long size = 0; //the amount of bytes downloaded by the thread

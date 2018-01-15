@@ -1,7 +1,6 @@
 import java.io.*;
 import java.security.NoSuchAlgorithmException;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -18,7 +17,7 @@ public class FileWriter implements Runnable {
     private ObjectOutputStream metadataStream;
     private ObjectOutputStream metadataBakStream;
     private long fileSize;
-    private long downloaded = 0;
+    private int downloaded = -1;
 
     FileWriter(DownloadableMetadata downloadableMetadata, BlockingQueue<Chunk> chunkQueue) {
         this.chunkQueue = chunkQueue;
@@ -39,15 +38,10 @@ public class FileWriter implements Runnable {
             endMarkerNotSeen = !checkIfDone(tempList, numOfElements);
             updateFile(tempList);
             updateMetadata(tempList);
-            //TODO should this print be here?
-            downloaded += (long)numOfElements * downloadableMetadata.getChunkSize();
-            System.out.println("Downloaded: " + downloaded + " out of " + fileSize + "\n" + downloadableMetadata.getDone() + "%");
-            //TODO
-            try {
-                Thread.sleep(1000);
-            }
-            catch (InterruptedException e){
-
+            int tempDone;
+            if((tempDone = downloadableMetadata.getDone()) != downloaded) {
+                downloaded = tempDone;
+                System.out.println("Downloaded: " + downloaded + "%");
             }
             tempList.clear();
         }
@@ -64,23 +58,24 @@ public class FileWriter implements Runnable {
         downloadableMetadata.addChunkList(i_list);
         try {
             //TODO
-            safeWriteWithBackupMD5(downloadableMetadata);
+            safeWriteWithBackup(downloadableMetadata);
         }
         catch (NoSuchAlgorithmException e){
             //Todo problem i need to print to screen and close program
         }
     }
 
-    private void safeWriteWithBackupMD5(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
+    private void safeWriteWithBackup(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
         try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()))) {
             writer.writeObject(downloadableMetadata);
             writer.flush();
             writer.close();
         }
-        //metadataStream.writeObject(downloadableMetadata);
-        //metadataStream.flush();
-        metadataBakStream.writeObject(downloadableMetadata);
-        metadataBakStream.flush();
+        try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename() + ".bak"))) {
+            writer.writeObject(downloadableMetadata);
+            writer.flush();
+            writer.close();
+        }
 
         //TODO look at https://stackoverflow.com/questions/415953/how-can-i-generate-an-md5-hash
     }
@@ -89,9 +84,6 @@ public class FileWriter implements Runnable {
     private void updateFile(LinkedList<Chunk> i_list) throws IOException{
         for (Chunk i: i_list) {
             if(i.getData() != null) {
-                if(i.getData().length != 4096){
-                    System.out.println("Fuck");
-                }
                 data.seek(i.getOffset());
                 data.write(i.getData(), 0, i.getSize_in_bytes());
             }
@@ -99,7 +91,6 @@ public class FileWriter implements Runnable {
 
 
     }
-
 
 
     private boolean checkIfDone(LinkedList<Chunk> i_list, int i_numOfElements) {
