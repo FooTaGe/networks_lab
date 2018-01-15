@@ -32,6 +32,7 @@ public class FileWriter implements Runnable {
         data = new RandomAccessFile(downloadableMetadata.getFilename(), "rws");
         metadataStream = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()));
         metadataBakStream = new ObjectOutputStream( new FileOutputStream(downloadableMetadata.getMetadataFilename() + ".bak"));
+
         boolean endMarkerNotSeen = true;
         while(endMarkerNotSeen){
             int numOfElements = chunkQueue.drainTo(tempList);
@@ -64,7 +65,6 @@ public class FileWriter implements Runnable {
         try {
             //TODO
             safeWriteWithBackupMD5(downloadableMetadata);
-            throw new NoSuchAlgorithmException();
         }
         catch (NoSuchAlgorithmException e){
             //Todo problem i need to print to screen and close program
@@ -72,10 +72,16 @@ public class FileWriter implements Runnable {
     }
 
     private void safeWriteWithBackupMD5(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
-        metadataStream.writeObject(downloadableMetadata);
-        metadataStream.flush();
+        try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()))) {
+            writer.writeObject(downloadableMetadata);
+            writer.flush();
+            writer.close();
+        }
+        //metadataStream.writeObject(downloadableMetadata);
+        //metadataStream.flush();
         metadataBakStream.writeObject(downloadableMetadata);
         metadataBakStream.flush();
+
         //TODO look at https://stackoverflow.com/questions/415953/how-can-i-generate-an-md5-hash
     }
 

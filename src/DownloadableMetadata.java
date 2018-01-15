@@ -19,10 +19,10 @@ public class DownloadableMetadata implements Serializable {
     private String filename;
     private String url;
     private long m_fileSize;
-    private boolean[] m_chunkMap;
+    private byte[] m_chunkMap;
     private int m_chunkSize;
     private int m_point = 0;
-    public final int PARTITION_SIZE = 1000;
+    public final int PARTITION_SIZE = 100;
     Lock lock;
     private int lastDoneReturned = 0;
     private static final long serialVersionUID = 1337L;
@@ -38,7 +38,7 @@ public class DownloadableMetadata implements Serializable {
         m_chunkSize = i_chunkSize;
         int arraySize = (int)(m_fileSize/i_chunkSize);
         arraySize += m_fileSize % i_chunkSize == 0 ? 0 : 1;
-        m_chunkMap = new boolean[arraySize];
+        m_chunkMap = new byte[arraySize];
         this.lock = new ReentrantLock(true);
 
     }
@@ -63,7 +63,7 @@ public class DownloadableMetadata implements Serializable {
             for (Chunk i : i_chunkList) {
                 if (i.getData() != null) {
                     int position = chunkOffsetToPosition(i.getOffset());
-                    m_chunkMap[position] = true;
+                    m_chunkMap[position] = 1;
                 }
             }
         } finally {
@@ -87,8 +87,8 @@ public class DownloadableMetadata implements Serializable {
     boolean isCompleted() {
         lock.lock();
         try {
-            for (boolean i : m_chunkMap) {
-                if (i == false) {
+            for (byte i : m_chunkMap) {
+                if (i == 0) {
                     return false;
                 }
             }
@@ -118,7 +118,7 @@ public class DownloadableMetadata implements Serializable {
             int end = start;
             // get start to the next empty space
             for (; start < m_chunkMap.length; start++) {
-                if (m_chunkMap[start] == false) {
+                if (m_chunkMap[start] == 0) {
                     end = start;
                     break;
                 } else if (start == m_chunkMap.length - 1) {
@@ -128,7 +128,7 @@ public class DownloadableMetadata implements Serializable {
             }
             //get end to start + PARTION_SIZE or till end of space
             for (int i = 1; i < PARTITION_SIZE && i + start < m_chunkMap.length; i++) {
-                if (m_chunkMap[start + i] == true) {
+                if (m_chunkMap[start + i] == 1) {
                     break;
                 }
                 end++;
@@ -179,13 +179,11 @@ public class DownloadableMetadata implements Serializable {
 
     public int getDone(){
         int count = 0;
-        for (boolean i: m_chunkMap) {
-            count += i ? 1 : 0;
+        for (byte i: m_chunkMap) {
+            count += i;
         }
         lastDoneReturned = (int)(count * 100 / (double)m_chunkMap.length);
         return lastDoneReturned;
     }
-    private void readObject(ObjectInputStream aInputStream) throws ClassNotFoundException, IOException {
-        aInputStream.defaultReadObject();
-    }
+
 }
