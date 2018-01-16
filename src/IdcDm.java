@@ -55,12 +55,11 @@ public class IdcDm {
      * @param maxBytesPerSecond limit on download bytes-per-second
      */
     private static void DownloadURL(String url, int numberOfWorkers, Long maxBytesPerSecond) {
-        //TODO what to do if throws?
         try {
             filesize = getContentLength(url);
         }
         catch (IOException e){
-
+            System.err.println("Failed to connect.");
         }
         TokenBucket tokenBucket;
         RateLimiter rateLimiter;
@@ -81,7 +80,6 @@ public class IdcDm {
          Thread rateLimiterThread =  new Thread(rateLimiter);
          rateLimiterThread.start();
 
-
         //todo is this the right place for this?
         //init fileWriter
         FileWriter fileWriter = new FileWriter(metadata, queue);
@@ -100,19 +98,17 @@ public class IdcDm {
                 Thread.sleep(1000);
             }
             catch (InterruptedException e){
-                //TODO
+                System.err.println("Failed to download.");
             }
         }
 
-        //TODO make this proper
-        //todo when finished all ranges
         queue.add(new Chunk(null, -1,0));
         try {
             fileWriterThread.join();
             rateLimiterThread.interrupt();
         }
         catch(InterruptedException e){
-            System.out.println(e);
+            System.err.println("Download interrupted.");
         }
         tokenBucket.terminate();
 
@@ -121,11 +117,24 @@ public class IdcDm {
         System.out.println("Download succeeded");
     }
 
+    /**
+     * Removes existing metadata
+     * @param i_filename
+     */
     private static void removeMetadata(String i_filename) {
         File metadata = new File(i_filename);
         metadata.delete();
     }
 
+    /**
+     * Creates new HTTPGetters
+     * @param url
+     * @param queue
+     * @param tokenBucket
+     * @param metadata
+     * @param numberOfWorkers
+     * @throws InterruptedException
+     */
     private static void callHTTPGetters(String url, BlockingQueue<Chunk> queue, TokenBucket tokenBucket , DownloadableMetadata metadata, int numberOfWorkers) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(numberOfWorkers);
         Range nextRange;
@@ -138,6 +147,11 @@ public class IdcDm {
 
     }
 
+    /**
+     * @param i_url
+     * @return length of file
+     * @throws IOException
+     */
     private static long getContentLength(String i_url) throws IOException{
         URL url = new URL(i_url);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -147,6 +161,11 @@ public class IdcDm {
         return contentLength;
     }
 
+    /**
+     * creates new metadata
+     * @param url
+     * @return the new metadata
+     */
     private static DownloadableMetadata initMetaData(String url) {
         String metadataName = DownloadableMetadata.getMetadataName(DownloadableMetadata.getName(url));
         if(Files.exists(Paths.get(metadataName))){
@@ -166,6 +185,11 @@ public class IdcDm {
         }
     }
 
+    /**
+     * load metadata if exists.
+     * @param metadataName
+     * @return metadata
+     */
     private static DownloadableMetadata tryLoadMetadata(String metadataName) {
         try {
             ObjectInputStream stream = new ObjectInputStream(new FileInputStream(metadataName));
@@ -176,14 +200,21 @@ public class IdcDm {
             return null;
         }
         catch (IOException e){
+            System.err.println("Failed to load metadata.");
             return null;
         }
         catch(ClassNotFoundException e){
+            System.err.println("Failed to load metadata.");
             return null;
         }
 
     }
 
+    /**
+     * Creates TokenBucket
+     * @param i_maxBytesPerSecond
+     * @return new TokenBucket
+     */
     private static TokenBucket initTokenBucket(Long i_maxBytesPerSecond) {
         TokenBucket tokenBucket;
         if (i_maxBytesPerSecond == null) {

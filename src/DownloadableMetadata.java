@@ -22,7 +22,7 @@ public class DownloadableMetadata implements Serializable {
     private byte[] m_chunkMap;
     private int m_chunkSize;
     private int m_point = 0;
-    public final int PARTITION_SIZE = 100;
+    public final int PARTITION_SIZE = 1000;
     Lock lock;
     private int lastDoneReturned = 0;
     private static final long serialVersionUID = 1337L;
@@ -43,20 +43,33 @@ public class DownloadableMetadata implements Serializable {
 
     }
 
-
+    /**
+     * adds ".metadata" to the file name
+     * @param filename
+     * @return new name
+     */
     public static String getMetadataName(String filename) {
         return filename + ".metadata";
     }
 
+    /**
+     * @param path
+     * @return the name of the downloaded file
+
+     */
     public static String getName(String path) {
         return path.substring(path.lastIndexOf('/') + 1, path.length());
     }
 
+    //unused
     void addRange(Range range) {
-        //TODO do the adding and stuff
 
     }
 
+    /**
+     * updates chunkList
+     * @param i_chunkList
+     */
     void addChunkList(List<Chunk> i_chunkList){
         lock.lock();
         try {
@@ -71,19 +84,35 @@ public class DownloadableMetadata implements Serializable {
         }
     }
 
+    /**
+     * @param offset
+     * @return chunk's offset position
+
+     */
     private int chunkOffsetToPosition(long offset) {
         int position = (int)(offset / m_chunkSize);
         return position;
     }
 
+    /**
+     * @return filename
+     */
     String getFilename() {
         return filename;
     }
 
+    /**
+     * @return metadata filename
+
+     */
     String getMetadataFilename() {
         return metadataFilename;
     }
 
+    /**
+     * checks if done downloading
+     * @return
+     */
     boolean isCompleted() {
         lock.lock();
         try {
@@ -98,8 +127,9 @@ public class DownloadableMetadata implements Serializable {
         }
     }
 
+    //unused
     void delete() {
-        //TODO
+
     }
 
     /**
@@ -143,6 +173,11 @@ public class DownloadableMetadata implements Serializable {
         }
     }
 
+    /**
+     * translates position in chunk map to bytes offset in range
+     * @param pos
+     * @return start position in range
+     */
     private long positionToEndOffset(int pos) {
         long ans = positionToStartOffset(pos);
         if(pos == m_chunkMap.length - 1){
@@ -154,26 +189,44 @@ public class DownloadableMetadata implements Serializable {
 
     }
 
+    /**
+     * resets pointer
+     */
     void ResetPoint(){
         m_point = 0;
     }
 
+    /**
+     * moves pointer to the start of a chunk
+     * @param pos
+     * @return
+     */
     private long positionToStartOffset(int pos) {
         return (long)pos * m_chunkSize;
     }
 
+    //unused
     String getUrl() {
         return url;
     }
+
+    /**
+     * returns filesize
+     */
 
     public long getFilesize() {
         return m_fileSize;
     }
 
+    //unused
     public long getChunkSize() {
         return m_chunkSize;
     }
 
+    /**
+     * returns completed chunks
+     * @return
+     */
     public int getDone(){
         int count = 0;
         for (byte i: m_chunkMap) {

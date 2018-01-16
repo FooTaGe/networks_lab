@@ -24,6 +24,12 @@ public class HTTPRangeGetter implements Runnable {
         this.tokenBucket = tokenBucket;
     }
 
+    /**
+     * It reads CHUNK_SIZE at a time and writs it into a BlockingQueue.
+     * It supports downloading a range of data, and limiting the download rate using a token bucket.
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private void downloadRange() throws IOException, InterruptedException {
         URL url = new URL(this.url);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -50,6 +56,13 @@ public class HTTPRangeGetter implements Runnable {
         connection.disconnect();
     }
 
+    /**
+     * reads an entire chunk from stream into data
+     * @param stream
+     * @param data
+     * @return
+     * @throws IOException
+     */
     private int readChunk(InputStream stream, byte[] data) throws IOException {
         int count = 0;
         int val;
@@ -60,12 +73,14 @@ public class HTTPRangeGetter implements Runnable {
             }
             data[count] = (byte) val;
         }
+
         return count;
     }
 
     public static int getChunkSize(){
         return CHUNK_SIZE;
     }
+
 
     public String GetRange(){
         return "bytes=" + range.getStart() + "-" + range.getEnd();

@@ -27,11 +27,16 @@ class TokenBucket {
         this.bucketLock = new ReentrantLock(true);
     }
 
+    /**
+     * removes tokens from the bucket every second
+     * @param tokens
+     */
     void take(long tokens) {
         boolean done = false;
         while(!done) {
             bucketLock.lock();
             try {
+                // checks if there are enough tokens in the bucket
                 if (numOfTokens - tokens >= 0) {
                     numOfTokens -= tokens;
                     done = true;
@@ -51,7 +56,10 @@ class TokenBucket {
         }
     }
 
-
+    /**
+     * adds tokens to the bucket
+     * @param tokens
+     */
     void add(long tokens) {
         bucketLock.lock();
         try {
@@ -62,15 +70,25 @@ class TokenBucket {
         }
     }
 
-    //TODO should these be locked as well?
+    /**
+     * terminates TokenBucket
+     */
     void terminate() {
         this.terminated = true;
     }
 
+    /**
+     * Checks if TokenBucket is terminated
+     * @return answer
+     */
     boolean terminated() {
         return terminated;
     }
 
+    /**
+     * Sets the TokenBucket to a given number of tokens
+     * @param tokens
+     */
     void set(long tokens) {
         bucketLock.lock();
         try {

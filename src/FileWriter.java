@@ -25,8 +25,11 @@ public class FileWriter implements Runnable {
         fileSize = downloadableMetadata.getFilesize();
     }
 
+    /**
+     * gather chunks and write into file
+     * @throws IOException
+     */
     private void writeChunks() throws IOException {
-        //TODO
         LinkedList<Chunk> tempList = new LinkedList<>();
         data = new RandomAccessFile(downloadableMetadata.getFilename(), "rws");
         metadataStream = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()));
@@ -54,24 +57,33 @@ public class FileWriter implements Runnable {
         closeStreams();
     }
 
+    /**
+     * closes streams
+     * @throws IOException
+     */
     private void closeStreams() throws IOException{
         data.close();
         metadataStream.close();
         metadataBakStream.close();
     }
 
+    /**
+     * updates metadata
+     * @param i_list
+     * @throws IOException
+     */
     private void updateMetadata(LinkedList<Chunk> i_list) throws IOException{
         downloadableMetadata.addChunkList(i_list);
-        try {
-            //TODO
-            safeWriteWithBackup(downloadableMetadata);
-        }
-        catch (NoSuchAlgorithmException e){
-            //Todo problem i need to print to screen and close program
-        }
+        safeWriteWithBackup(downloadableMetadata);
     }
 
-    private void safeWriteWithBackup(DownloadableMetadata downloadableMetadata) throws IOException, NoSuchAlgorithmException {
+    /**
+     * Writes the metadata in a safe way
+     * @param downloadableMetadata
+     * @throws IOException
+     * @throws NoSuchAlgorithmException
+     */
+    private void safeWriteWithBackup(DownloadableMetadata downloadableMetadata) throws IOException {
         try (ObjectOutputStream writer = new ObjectOutputStream(new FileOutputStream(downloadableMetadata.getMetadataFilename()))) {
             writer.writeObject(downloadableMetadata);
             writer.flush();
@@ -82,11 +94,13 @@ public class FileWriter implements Runnable {
             writer.flush();
             writer.close();
         }
-
-        //TODO look at https://stackoverflow.com/questions/415953/how-can-i-generate-an-md5-hash
     }
 
-
+    /**
+     * updates file
+     * @param i_list
+     * @throws IOException
+     */
     private void updateFile(LinkedList<Chunk> i_list) throws IOException{
         for (Chunk i: i_list) {
             if(i.getData() != null) {
@@ -94,11 +108,14 @@ public class FileWriter implements Runnable {
                 data.write(i.getData(), 0, i.getSize_in_bytes());
             }
         }
-
-
     }
 
-
+    /**
+     * checks if done
+     * @param i_list
+     * @param i_numOfElements
+     * @return
+     */
     private boolean checkIfDone(LinkedList<Chunk> i_list, int i_numOfElements) {
         if(i_numOfElements > 0){
             Chunk lastChunk = i_list.getLast();
