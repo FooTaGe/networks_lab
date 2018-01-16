@@ -34,6 +34,12 @@ public class FileWriter implements Runnable {
 
         boolean endMarkerNotSeen = true;
         while(endMarkerNotSeen){
+            try{
+                Thread.sleep(500);
+            }
+            catch (InterruptedException e){
+
+            }
             int numOfElements = chunkQueue.drainTo(tempList);
             endMarkerNotSeen = !checkIfDone(tempList, numOfElements);
             updateFile(tempList);

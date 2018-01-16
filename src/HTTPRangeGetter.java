@@ -72,12 +72,13 @@ public class HTTPRangeGetter implements Runnable {
     }
     @Override
 
-    public void run() {
+    public void run(){
         try {
             this.downloadRange();
         } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-            //TODO
+            if(e instanceof IOException){
+                System.err.println("There was an error connecting to the server, please try again. Download failed");
+            }
         }
     }
 }

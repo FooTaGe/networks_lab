@@ -28,11 +28,26 @@ class TokenBucket {
     }
 
     void take(long tokens) {
-        bucketLock.lock();
-        try {
-            this.numOfTokens = tokens > numOfTokens ? numOfTokens : tokens;
-        } finally {
-            bucketLock.unlock();
+        boolean done = false;
+        while(!done) {
+            bucketLock.lock();
+            try {
+                if (numOfTokens - tokens >= 0) {
+                    numOfTokens -= tokens;
+                    done = true;
+                }
+            } finally {
+                bucketLock.unlock();
+            }
+
+            if(!done){
+                try {
+                    Thread.sleep(200);
+                }
+                catch (InterruptedException e){
+
+                }
+            }
         }
     }
 

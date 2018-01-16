@@ -89,31 +89,14 @@ public class IdcDm {
         Thread fileWriterThread = new Thread(fileWriter);
         fileWriterThread.start();
 
+        int temp = (int)(filesize / (HTTPRangeGetter.CHUNK_SIZE * metadata.PARTITION_SIZE));
+        int realNumberOfWorkers = Math.min(temp , numberOfWorkers);
+        realNumberOfWorkers = realNumberOfWorkers == 0 ? 1 : realNumberOfWorkers;
 
-        /**
-        //init executer ranges
-        long startRange = 0;
-        long filesize = 0;
-        //TODO decie how to deal with this exeption
-        try {
-            filesize = getContentLength(url);
-        }
-        catch (IOException e){
-            //TODO do something- cannot continue without files size unless using 1 thread only
-        }
-        long rangeSize = filesize / numberOfWorkers;
-       for (int i = 0; i < numberOfWorkers; i++){
-           Range thisRange = i == numberOfWorkers - 1 ? new Range(startRange, filesize - 1) :
-                   new Range(startRange, startRange + rangeSize - 1);
-           executor.execute(new HTTPRangeGetter(url, thisRange, queue, tokenBucket));
-           startRange += rangeSize;
-       }
-        **/
-
-
+        int a = Integer.MAX_VALUE;
         while (!metadata.isCompleted()) {
             try {
-                callHTTPGetters(url, queue, tokenBucket, metadata, numberOfWorkers);
+                callHTTPGetters(url, queue, tokenBucket, metadata, realNumberOfWorkers);
                 Thread.sleep(1000);
             }
             catch (InterruptedException e){
@@ -133,8 +116,14 @@ public class IdcDm {
         }
         tokenBucket.terminate();
 
+        removeMetadata(metadata.getFilename() + ".metadata");
+        removeMetadata(metadata.getFilename() + ".metadata.bak");
+        System.out.println("Download succeeded");
+    }
 
-        //TODO
+    private static void removeMetadata(String i_filename) {
+        File metadata = new File(i_filename);
+        metadata.delete();
     }
 
     private static void callHTTPGetters(String url, BlockingQueue<Chunk> queue, TokenBucket tokenBucket , DownloadableMetadata metadata, int numberOfWorkers) throws InterruptedException {
@@ -200,7 +189,9 @@ public class IdcDm {
         if (i_maxBytesPerSecond == null) {
             tokenBucket = new TokenBucket(Long.MAX_VALUE);
         } else {
-            tokenBucket = new TokenBucket(i_maxBytesPerSecond * 10);
+            //make sure bucket size is at least CHUNK_SIZE
+            long bucketSize = i_maxBytesPerSecond * 5 > HTTPRangeGetter.CHUNK_SIZE ? i_maxBytesPerSecond * 5 : HTTPRangeGetter.CHUNK_SIZE;
+            tokenBucket = new TokenBucket(bucketSize);
         }
         return tokenBucket;
     }
